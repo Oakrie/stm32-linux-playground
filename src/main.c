@@ -18,87 +18,88 @@
 
 #include "stm32f446xx.h"
 #include "stm32f4xx_ll_rcc.h"
+#include "stm32f4xx_ll_system.h"
 
 #include "systemclock.h"
 #include "helperfunctions.h"
 #include "gpio.h"
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
-  #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
+#warning                                                                       \
+    "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
 void SystemInit(void)
 {
-	volatile uint32_t Freq = __LL_RCC_CALC_PLLCLK_FREQ (HSI_VALUE, LL_RCC_PLL_GetDivider(), LL_RCC_PLL_GetN(), LL_RCC_PLL_GetP ());
+    LL_RCC_HSI_Enable();
+    while (!LL_RCC_HSI_IsReady());
 
-	// Configure PLL
-	uint32_t* pRCCCR = (uint32_t*)RCC_CR_ADDR;
-	
-	// Set PLLON bit to on to start it
-	BitSet(pRCCCR, RCC_CR_PLLON_BIT);
-	
-	// Set system clock to PLL
-	SetSysClock(2);
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_5);
+    while (LL_FLASH_GetLatency() != LL_FLASH_LATENCY_5);
 
-	Freq = Freq + 1;
+    // VCO = 16/8 * 180 = 360 MHz
+    // PLLP_DIV_2 -> 180 MHz
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_8, 180,
+                                LL_RCC_PLLP_DIV_2);
+    LL_RCC_PLL_Enable();
+    while (!LL_RCC_PLL_IsReady());
 
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2); // APB1 max is 45 MHz
+    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
+
+    // This is the step that was missing
+    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+    while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL);
 }
 
 int sleeploop()
 {
 
-	for (int i=0 ; i < 1000000; i++)
-	{
-		__asm__("nop");
-	}
+    for (int i = 0; i < 1000000; i++)
+    {
+        __asm__("nop");
+    }
 
-	return 0;
+    return 0;
 }
-
 
 void configureGPIO()
 {
 
-	// Enable clock
-	uint32_t* pRCCAHB1ENR = (uint32_t *) RCC_AHB1ENR_ADDR;
-	BitSet(pRCCAHB1ENR, RCC_AHB1ENR_GPIOA_BIT);
+    // Enable clock
+    uint32_t *pRCCAHB1ENR = (uint32_t *)RCC_AHB1ENR_ADDR;
+    BitSet(pRCCAHB1ENR, RCC_AHB1ENR_GPIOA_BIT);
 
+    // Set PA5 as output
+    uint32_t *pGPIOA_MODE = (uint32_t *)(GPIO_A_BASE + GPIO_MODE_R_OFFSET);
 
-	// Set PA5 as output
-	uint32_t* pGPIOA_MODE = (uint32_t *)(GPIO_A_BASE + GPIO_MODE_R_OFFSET);
+    // Set moder5 to 0b01, bit 11:10
+    BitClear(pGPIOA_MODE, 11);
+    BitSet(pGPIOA_MODE, 10);
 
-	// Set moder5 to 0b01, bit 11:10
-	BitClear(pGPIOA_MODE, 11);
-	BitSet(pGPIOA_MODE, 10);
+    uint32_t *pGPIOA_PUPD = (uint32_t *)(GPIO_A_BASE + GPIO_PUPD_R_OFFSET);
 
-	uint32_t* pGPIOA_PUPD = (uint32_t *)(GPIO_A_BASE + GPIO_PUPD_R_OFFSET);
-
-	BitClear(pGPIOA_PUPD, 11);
-	BitClear(pGPIOA_PUPD, 10);
-
-	//#define RCC_AHB1ENR_GPIOA_BIT 0
-	//#define RCC_AHB1ENR_GPIOC_BIT 2
-
-
+    BitClear(pGPIOA_PUPD, 11);
+    BitClear(pGPIOA_PUPD, 10);
 }
 
 int main(void)
 {
-	configureGPIO();
-	uint32_t* pGPIOAODR = (uint32_t *)(GPIO_A_BASE + GPIO_OD_R_OFFSET);
-	uint32_t* pRCCCR = (uint32_t*)RCC_CR_ADDR;
-	uint32_t* pRCCCFGR = (uint32_t*)RCC_CFGR_ADDR;
+    configureGPIO();
+    uint32_t *pGPIOAODR = (uint32_t *)(GPIO_A_BASE + GPIO_OD_R_OFFSET);
+    uint32_t *pRCCCR = (uint32_t *)RCC_CR_ADDR;
+    uint32_t *pRCCCFGR = (uint32_t *)RCC_CFGR_ADDR;
 
-	BitCheck(*pRCCCR, 1);
-	BitCheck(*pRCCCFGR, 1);
+    BitCheck(*pRCCCR, 1);
+    BitCheck(*pRCCCFGR, 1);
     /* Loop forever */
-	for(;;)
-	{
+    for (;;)
+    {
 
-		BitSet(pGPIOAODR, 5);
-		sleeploop();
-		BitClear(pGPIOAODR, 5);
-		sleeploop();
-
-	}
+        BitSet(pGPIOAODR, 5);
+        sleeploop();
+        BitClear(pGPIOAODR, 5);
+        sleeploop();
+    }
 }

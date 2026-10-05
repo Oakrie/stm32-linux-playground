@@ -1,0 +1,31 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Line length
+ColumnLimit: 80
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Allman braces: opening brace on its own line, aligned with the statement
+BreakBeforeBraces: Allman
+
+# Space after if/while/for/switch: "if (x)"
+SpaceBeforeParens: ControlStatements
+
+# Never put short blocks/statements on one line
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: true  # allows "while (busy);" busy-waits
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortCaseLabelsOnASingleLine: false
+
+# Pointers bind to the variable: "uint32_t *p"
+PointerAlignment: Right
+
+# Keep include order as written (startup/CMSIS headers can be order-sensitive)
+SortIncludes: Never
+...
